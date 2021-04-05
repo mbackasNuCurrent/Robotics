@@ -59,7 +59,7 @@ CONTRIBUTORS:
 Naman Jindal    (namanj2)
 Kyle Jensen     (kejense2)
 
-If you have any issues, questions or suggestions, email us or reply to @289 on Piazza! 
+If you have any issues, questions or suggestions, email us or reply to @289 on Piazza!
 
 April 2018 Edition
 Pre-Exam 5.1
@@ -86,9 +86,9 @@ def bracket(v):
                         [ np.zeros((1,4))          ]])
     elif(v.shape == (3,1)):
         rtn = np.zeros((3,3))
-        rtn[0][1] = - v[2]
-        rtn[0][2] =   v[1]
-        rtn[1][2] = - v[0]
+        rtn[0][1] = - np.real(v[2])
+        rtn[0][2] =   np.real(v[1])
+        rtn[1][2] = - np.real(v[0])
         rtn = rtn - rtn.transpose()
     return rtn
 
@@ -106,9 +106,9 @@ def inv_bracket(m):
     elif(m.shape == (3,3)):
         m = m - m.transpose()
         rtn = np.zeros((3,1))
-        rtn[2] = - m[0][1]/2
-        rtn[1] =   m[0][2]/2
-        rtn[0] = - m[1][2]/2
+        rtn[2] = - np.real(m[0][1]/2)
+        rtn[1] =   np.real(m[0][2]/2)
+        rtn[0] = - np.real(m[1][2]/2)
     return rtn
 
 def adj_T(T):
@@ -128,7 +128,7 @@ def toPose(rot, pos):
     :returns: A 4x4 HTC matrix as a numpy array
     """
     return np.block([[ rot, pos  ],
-                     [ [0,0,0,1] ]])
+                     [ 0,0,0,1   ]])
 
 def fromPose(T):
     """
@@ -162,7 +162,7 @@ def toScrew(a, q=None):
 def toTs(S, theta):
     """
     Generates a list of HCT matricies from a list of screw axes and joint variables. Not that useful for general work,
-    but used by other functions. 
+    but used by other functions.
     :param S: A python list of 6x1 screw axes
     :param theta: A list/numpy array of joint vars. Should have the same number of elements as S
     :returns: A python list of 4x4 HCT matricies representing a transformation by each of the screw axes
@@ -183,10 +183,10 @@ def sequential_Ts(S, theta):
 
 def evalT(S, theta, M=np.identity(4)):
     """
-    Basically Forward Kinematics 
+    Basically Forward Kinematics
     Finds the end position of a robot based on space screw axes, joint vars and the space 'zero HCT'
     Note that numpy arrays of screw axes are not supported, only python lists of screw axes.
-    Use np.hsplit(S, N) to generate a list of screw axes given a numpy array S where N is the number of joints (cols in the matrix) 
+    Use np.hsplit(S, N) to generate a list of screw axes given a numpy array S where N is the number of joints (cols in the matrix)
     :param S: A python list of 6x1 screw axes from the base to the manipulator
     :param theta: A python list/numpy array of joint vars in the same order as S.
     :param M: A 4x4 HCT transformation matrix representing the pose of the end effector when theta = 0 for all joint vars
@@ -213,12 +213,12 @@ def evalJ(S, theta):
         J.append(adj_T(t).dot(s))
     return np.hstack(J)
 
-def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.05):
+def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.0001):
     """
     Basically Inverse Kinematics
-    Uses Newton's method to find joint vars to reach a given pose for a given robot. Returns joint positions and 
+    Uses Newton's method to find joint vars to reach a given pose for a given robot. Returns joint positions and
     the error. endT, S, and M should be provided in the space frame. Stop condiditons are when the final pose is less than a given
-    twist norm from the desired end pose or a maximum number of iterations are reached. 
+    twist norm from the desired end pose or a maximum number of iterations are reached.
     TODO: Improve internal type flexibilty of input types
     :param endT: the desired end pose of the end effector
     :param S: a python list of 6x1 screw axes in the space frame
@@ -227,24 +227,49 @@ def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.05):
     :param max_iter: Optional - The maximum number of iterations of newtons method for error to fall below max_err. Default is 10
     :param max_err: Optional - The maximum error to determine the end of iterations before max_iter is reached. Default is 0.001 and should be good for PL/quizes
     :param mu: The normalizing coefficient (?) when computing the pseudo-inverse of the jacobian. Default is 0.05
-    :returns: A tuple where the first element is an Nx1 numpy array of joint variables where the algorithm ended. Second 
+    :returns: A tuple where the first element is an Nx1 numpy array of joint variables where the algorithm ended. Second
               element is the norm of the twist required to take the found pose to the desired pose. Essentially the error that PL checks against.
     """
     if isinstance(S, list):
         S = np.hstack(S)
-    
+
     if  theta is None:
         theta = np.zeros((S.shape[1],1))
-    V = np.ones((6,1))
-    while np.linalg.norm(V) > max_err and max_iter > 0:
-        curr_pose = evalT(S, theta, M)
-        V = inv_bracket(logm(endT.dot(inv(curr_pose))))
-        J = evalJ(S, theta)
-        pinv = inv(J.transpose().dot(J) + mu*np.identity(S.shape[1])).dot(J.transpose())
-        thetadot = pinv.dot(V)
-        theta = theta + thetadot
-        max_iter -= 1;
-    return (theta, np.linalg.norm(V))
+    outMat = []
+    max_it = max_iter
+    for i in range(2**(S.shape[1]-2)):
+        V = np.ones((6,1))
+        max_iter = max_it
+        while np.linalg.norm(V) > max_err and max_iter > 0:
+            curr_pose = evalT(S, theta, M)
+            V = inv_bracket(logm(endT.dot(inv(curr_pose))))
+            J = evalJ(S, theta)
+            pinv = inv(J.transpose().dot(J) + mu*np.identity(S.shape[1])).dot(J.transpose())
+            thetadot = pinv.dot(V)
+
+            theta = theta + thetadot
+            for j in range(theta.size):
+                while(theta[j]>=np.pi):
+                    theta[j]-=2*np.pi
+                while(theta[j]<-np.pi):
+                    theta[j]+=2*np.pi
+            max_iter -= 1;
+        if(np.linalg.norm(V) <= max_err):
+            theta_cop = theta
+#             print(theta_cop)
+            novel = True
+            for a in outMat:
+#                 print(np.linalg.norm(theta_cop-a))
+                if(np.linalg.norm(theta_cop-a)<1):
+                    novel = False
+            if(novel):
+                outMat.append(theta_cop)
+#                 print(outMat)
+        theta = np.zeros((S.shape[1],1))
+        for k in range(theta.shape[0]-2):
+            theta[k,0]=float(format(i,'04b')[k])-0.5
+#     print(outMat)
+    return (outMat,np.linalg.norm(V))
 
 def matrix_linspace(m_start, m_end, num, to_end=False):
     """
@@ -266,20 +291,20 @@ def matrix_linspace(m_start, m_end, num, to_end=False):
     ret = []
     for i in range(num):
         ret.append(m_start + i * diff)
-    return ret 
+    return ret
 
 class Tree:
     """
     Simple generic tree data structure - Uses a dictionary as underlying implementation
     Can take any value for internal elements that supports string cast.
-    
+
     Note - string casting is used as the hash function so identical strings will mean identical elements.
 
-    Not performance optimized, but should work fo the course. 
+    Not performance optimized, but should work fo the course.
     Note: does not support removal/modification of tree structure other than insert
 
     Class is also iterable and supports python loops such as
-    
+
     t1 = Tree("el1")
     ...
     for e in t1:
@@ -316,7 +341,7 @@ class Tree:
 
     def __iter__(self):
         return list.__iter__(self.getElements())
-   
+
     @staticmethod
     def _hash(el):
         return hash(str(el))
@@ -330,7 +355,7 @@ def multi_transform(pts, S, theta):
     Transforms a list of points by a given screw axis and theta combination. The number of points should be greater than or
     equal to the number of screw axes. Points will be transformed as follows:
     TODO DOC
-    """ 
+    """
     Ns = 0
     Np = 0
     if isinstance(S, np.ndarray):
@@ -361,11 +386,11 @@ def finalpos(S, theta, start):
     """ This function finds the final position of all joints. Solution to 5.1.3.
     Parameters:
     S: the 6x6 matrix of the spatial screw axes for all joints.
-    theta: a 6x1 matrix representing a certain configuration of the robot. 
+    theta: a 6x1 matrix representing a certain configuration of the robot.
     start: a 3x8 where the i'th column represents the initial position of the ith joint in terms of frame 0. """
-    
+
     position = start[:,:2]
-    
+
     for i in range(2,8):
         M = np.identity(4)
         M[0,3] = start[0, i]
@@ -380,25 +405,25 @@ def checkcollision(p, r, q, s):
     """checkcollision is the solution to 5.1.2.
     Parameters:
     p: a 3xn matrix which represents the positions of all spheres.
-    r: a 1xn matrix representing the radii of every sphere. 
+    r: a 1xn matrix representing the radii of every sphere.
     q: a 3x1 matrix representing the position of the final sphere.
     s: the radius of the final sphere"""
-    
+
     c = np.zeros(r.shape[1])
     for i in range(p.shape[1]):
         dis = Dist3D(q, p[:,[i]])
         if(dis < (r[:,i]+s)):
             c[i]+=1
     return c
-        
+
 
 def checkselfcollision(S, theta, start, r):
     """checkselfcollisions checks whether a certain series of configurations causes a self collision. Solution to 5.1.5
     S: a 6x6 matrix of the spatial screw axes for all joints.
     theta: a 6xn matrix of configurations. Notice that the ith column of this matrix is a 6x1 theta matrix representing a certain configuration of the robot
-    start: a 3x8 matrix of joint starting positions in frame 0. 
+    start: a 3x8 matrix of joint starting positions in frame 0.
     r: a given radius for surrounding spheres"""
-    
+
     c = np.zeros(theta.shape[1])
     for i in range(theta.shape[1]):
         t = theta[:,[i]]
@@ -409,7 +434,7 @@ def checkselfcollision(S, theta, start, r):
                 if(k != j):
                     if(Dist3D(joint2check, jointpos[:,[k]])< (r+r)):
                         c[i] = 1
-                    
+
     return c
 
 
