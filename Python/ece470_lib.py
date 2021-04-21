@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.linalg import inv, norm
+from numpy.linalg import pinv, norm
 from scipy.linalg import expm, logm
 
 """
@@ -237,26 +237,28 @@ def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.0001):
         theta = np.zeros((S.shape[1],1))
     outMat = []
     max_it = max_iter
-    for i in range(2**(S.shape[1]-2)):
+    for i in range(2**3):
         V = np.ones((6,1))
         max_iter = max_it
         while np.linalg.norm(V) > max_err and max_iter > 0:
             curr_pose = evalT(S, theta, M)
-            V = inv_bracket(logm(endT.dot(inv(curr_pose))))
+            temp = pinv(curr_pose)
+            temp1 = endT.dot(temp)
+            temp2 = logm(temp1)
+            V = inv_bracket(temp2)
             J = evalJ(S, theta)
-            pinv = inv(J.transpose().dot(J) + mu*np.identity(S.shape[1])).dot(J.transpose())
-            thetadot = pinv.dot(V)
+            peeinv = pinv(J.transpose().dot(J) + mu*np.identity(S.shape[1])).dot(J.transpose())
+            thetadot = peeinv.dot(V)
 
             theta = theta + thetadot
-            for j in range(theta.size):
-                while(theta[j]>=np.pi):
-                    theta[j]-=2*np.pi
-                while(theta[j]<-np.pi):
-                    theta[j]+=2*np.pi
             max_iter -= 1;
-        if(np.linalg.norm(V) <= max_err):
+        for j in range(theta.size):
+            while(theta[j]>=np.pi):
+                theta[j]-=2*np.pi
+            while(theta[j]<-np.pi):
+                theta[j]+=2*np.pi
+        if(np.linalg.norm(V) <= max_err and isValidTheta(theta)):
             theta_cop = theta
-#             print(theta_cop)
             novel = True
             for a in outMat:
 #                 print(np.linalg.norm(theta_cop-a))
@@ -266,8 +268,8 @@ def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.0001):
                 outMat.append(theta_cop)
 #                 print(outMat)
         theta = np.zeros((S.shape[1],1))
-        for k in range(theta.shape[0]-2):
-            theta[k,0]=float(format(i,'04b')[k])-0.5
+        for k in range(3):
+            theta[k,0]=(float(format(i,'03b')[k])-0.5)*np.pi/50
 #     print(outMat)
     return (outMat,np.linalg.norm(V))
 
@@ -436,6 +438,16 @@ def checkselfcollision(S, theta, start, r):
                         c[i] = 1
 
     return c
-
+def isValidTheta(thetas):
+    valid = True
+    if(thetas[1][0]>160/180*np.pi or thetas[1][0]<-70/180*np.pi):
+        return False
+    if(thetas[2][0]>130/180*np.pi or thetas[2][0]<-130/180*np.pi):
+        return False
+    angle = thetas[1][0]+thetas[2][0]
+    if(angle < -np.pi/2 or angle > 3*np.pi/2):
+        return False
+    return valid
+    
 
 
