@@ -444,8 +444,8 @@ def isValidTheta(thetas):
         return False
     if(thetas[2][0]>130/180*np.pi or thetas[2][0]<-130/180*np.pi):
         return False
-    angle = thetas[1][0]+thetas[2][0]
-    if(angle < -np.pi/2 or angle > 3*np.pi/2):
+    angle = thetas[4][0]
+    if(angle < -np.pi-np.pi/4 or angle > 3*np.pi/2-np.pi/4):
         return False
     return valid
     
