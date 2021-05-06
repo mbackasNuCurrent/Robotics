@@ -237,8 +237,7 @@ def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.0001):
         theta = np.zeros((S.shape[1],1))
     outMat = []
     max_it = max_iter
-    jays=2
-    for i in range(2**jays):
+    for i in range(2**3):
         V = np.ones((6,1))
         max_iter = max_it
         while np.linalg.norm(V) > max_err and max_iter > 0:
@@ -269,8 +268,8 @@ def findIK(endT, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.0001):
                 outMat.append(theta_cop)
 #                 print(outMat)
         theta = np.zeros((S.shape[1],1))
-        for k in range(jays):
-            theta[k,0]=(float(format(i,'02b')[k])-0.5)*np.pi/20
+        for k in range(3):
+            theta[k,0]=(float(format(i,'03b')[k])-0.5)*np.pi/50
 #     print(outMat)
     return (outMat,np.linalg.norm(V))
 
