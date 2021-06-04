@@ -215,7 +215,7 @@ def evalJ(S, theta):
         J.append(adj_T(t).dot(s))
     return np.hstack(J)
 
-def findIK(endT, ang, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.01):
+def findIK(endT, ang, S, M, theta=None, max_iter=100, max_err = 0.01, mu=5):
     """
     Basically Inverse Kinematics
     Uses Newton's method to find joint vars to reach a given pose for a given robot. Returns joint positions and
@@ -243,8 +243,10 @@ def findIK(endT, ang, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.01):
     for i in range(2**jays):
         V = np.ones((6,1))
         max_iter = max_it
+        itr=0;
         while np.linalg.norm(V) > max_err and max_iter > 0:
-#             print('poo')
+            # print('itr=',itr)
+            itr+=1
             curr_pose = evalT(S, theta, M)
             temp = pinv(curr_pose)
             temp1 = endT.dot(temp)
@@ -273,7 +275,8 @@ def findIK(endT, ang, S, M, theta=None, max_iter=100, max_err = 0.001, mu=0.01):
 #                 print(outMat)
         theta = np.zeros((S.shape[1],1))
         for k in range(jays):
-            theta[k,0]=(float(format(i,'02b')[k]))*np.pi-0.1
+            seed = format(i,'08b')
+            theta[k,0]=float(seed[-k])*np.pi-0.14623456443
 #     print(outMat)
     return (outMat,np.linalg.norm(V))
 
@@ -449,10 +452,10 @@ def isValidTheta(thetas,ang):
     if(thetas[2][0]>130/180*np.pi or thetas[2][0]<-130/180*np.pi):
         return False
     angle = thetas[1][0]+thetas[2][0]
-    if(angle < -np.pi+ang or angle > np.pi+ang):
+    if(angle < -np.pi/2+ang or angle > 3*np.pi/2+ang):
         return False
     return valid
-    
+
 def validThetas(X,Y,Z,S,M,goalRot,ang):
     validTheta = np.zeros((X.size, Y.size, Z.size)); # indicates presence of solution at each test point
     thetaMap = [[[np.ones((6,1))*-99 for i in range(Z.size)] for j in range(Y.size)] for k in range(X.size)]; #initiate ik Map
